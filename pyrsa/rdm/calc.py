@@ -295,6 +295,7 @@ def calc_rdm_crossnobis(dataset, descriptor, noise=None,
             measurements_test, _, _ = \
                 average_dataset_by(data_test, descriptor)
             n_cond = measurements_train.shape[0]
+            n_channel = measurements_train.shape[1]
             rdm = np.empty(int(n_cond * (n_cond-1) / 2))
             k = 0
             for i_cond in range(n_cond - 1):
@@ -304,10 +305,11 @@ def calc_rdm_crossnobis(dataset, descriptor, noise=None,
                     diff_test = measurements_test[i_cond] \
                         - measurements_test[j_cond]
                     if noise is None:
-                        rdm[k] = np.sum(diff_train * diff_test)
+                        rdm[k] = np.sum(diff_train * diff_test / n_channel)
                     else:
                         rdm[k] = np.sum(diff_train
-                                        * np.matmul(noise, diff_test))
+                                        * np.matmul(noise, diff_test)
+                                        / n_channel)
                     k += 1
             rdms.append(rdm)
             weights.append(data_test.n_obs)
