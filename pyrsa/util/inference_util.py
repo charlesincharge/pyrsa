@@ -91,6 +91,12 @@ def pool_rdm(rdms, method='cosine', sigma_k=None):
         rdm_vec = rdm_vec / np.nanstd(rdm_vec, axis=1, keepdims=True)
         rdm_vec = _nan_mean(rdm_vec)
         rdm_vec = rdm_vec - np.nanmin(rdm_vec)
+    elif method == 'pcorr':
+        Warning('Not implemented! Returning corr ceiling')
+        rdm_vec = rdm_vec - np.nanmean(rdm_vec, axis=1, keepdims=True)
+        rdm_vec = rdm_vec / np.nanstd(rdm_vec, axis=1, keepdims=True)
+        rdm_vec = _nan_mean(rdm_vec)
+        rdm_vec = rdm_vec - np.nanmin(rdm_vec)
     elif method == 'cosine_cov':
         rdm_vec = rdm_vec / np.sqrt(np.nanmean(rdm_vec ** 2, axis=1,
                                                keepdims=True))

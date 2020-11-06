@@ -4,6 +4,8 @@
 Comparison methods for comparing two RDMs objects
 """
 import numpy as np
+import pandas as pd
+import pingouin as pg
 import scipy.stats
 from scipy.stats._stats import _kendall_dis
 from pyrsa.util.matrix import pairwise_contrast_sparse
@@ -11,7 +13,7 @@ from pyrsa.util.rdm_utils import _get_n_from_reduced_vectors
 from pyrsa.util.matrix import row_col_indicator_g
 
 
-def compare(rdm1, rdm2, method='cosine', sigma_k=None):
+def compare(rdm1, rdm2, method='cosine', sigma_k=None, **kwargs):
     """calculates the distances between two RDMs objects using a chosen method
 
     Args:
@@ -24,6 +26,7 @@ def compare(rdm1, rdm2, method='cosine', sigma_k=None):
             'cosine' = cosine distance
             'spearman' = spearman rank correlation distance
             'corr' = pearson correlation distance
+            'pcorr' = partial correlation, with covaraiate
             'kendall' = kendall-tau based distance
     Returns:
         numpy.ndarray: dist:
@@ -36,6 +39,8 @@ def compare(rdm1, rdm2, method='cosine', sigma_k=None):
         sim = compare_spearman(rdm1, rdm2)
     elif method == 'corr':
         sim = compare_correlation(rdm1, rdm2)
+    elif method == 'pcorr':
+        sim = compare_partial_correlation(rdm1, rdm2, other_rdms=kwargs['other_rdms'])
     elif method == 'kendall' or method == 'tau-b':
         sim = compare_kendall_tau(rdm1, rdm2)
     elif method == 'tau-a':
@@ -87,6 +92,51 @@ def compare_correlation(rdm1, rdm2):
     vector1 = vector1 - np.mean(vector1, 1, keepdims=True)
     vector2 = vector2 - np.mean(vector2, 1, keepdims=True)
     sim = _cosine(vector1, vector2)
+    return sim
+
+
+def compare_partial_correlation(rdm1, rdm2, other_rdms=None):
+    """calculates the partial correlation between two RDMs objects
+    with covariate RDMs
+
+    Args:
+        rdm1 (pyrsa.rdm.RDMs):
+            first set of RDMs
+        rdm2 (pyrsa.rdm.RDMs):
+            second set of RDMs
+        other_rdms (list of pyrsa.rdm.RDMs):
+            list of covariate RDMs RDMs
+    Returns:
+        numpy.ndarray: dist:
+            correlation distance between the two RDMs
+
+    """
+    vector1, vector2 = _parse_input_rdms(rdm1, rdm2)
+    other_vectors = []
+    other_vector_names = []
+    for idx, rdm in enumerate(other_rdms):
+        vector = rdm.get_vectors()
+        if vector.shape[0] != 1:
+            raise NotImplementedError('Currently only supports single-RDM for covariates')
+        other_vectors.append(vector.flatten())
+        other_vector_names.append('other{}'.format(idx))
+
+    # Iterate over vector2, to get each partial corr with each value in vector1
+    sim = np.zeros(shape=(vector1.shape[0], vector2.shape[0]))
+    for vector1_idx, sub_vector1 in enumerate(vector1):
+        for vector2_idx, sub_vector2 in enumerate(vector2):
+            df = pd.DataFrame({
+                'vector1' : sub_vector1,
+                'vector2' : sub_vector2,
+                })
+            for vector_name, vector in zip(other_vector_names, other_vectors):
+                df[vector_name] = vector
+            pcorr = pg.partial_corr(
+                    data=df, x='vector1', y='vector2',
+                    covar=other_vector_names,
+                    method='spearman') # Note: may want to change.
+            sim[vector1_idx, vector2_idx] = pcorr.r
+
     return sim
 
 
@@ -351,8 +401,9 @@ def _cosine(vector1, vector2):
     # compute all inner products
     cos = np.einsum('ij,kj->ik', vector1, vector2)
     # divide by sqrt of the inner products with themselves
-    cos /= np.sqrt(np.einsum('ij,ij->i', vector1, vector1)).reshape((-1, 1))
-    cos /= np.sqrt(np.einsum('ij,ij->i', vector2, vector2)).reshape((1, -1))
+    if np.count_nonzero(cos) > 0:
+        cos /= np.sqrt(np.einsum('ij,ij->i', vector1, vector1)).reshape((-1, 1))
+        cos /= np.sqrt(np.einsum('ij,ij->i', vector2, vector2)).reshape((1, -1))
     return cos
 
 

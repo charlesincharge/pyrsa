@@ -6,6 +6,7 @@ evaluate model performance
 
 import numpy as np
 import tqdm
+import pingouin as pg
 from collections.abc import Iterable
 from pyrsa.rdm import compare
 from pyrsa.inference import bootstrap_sample
@@ -208,12 +209,12 @@ def eval_bootstrap_rdm(models, data, theta=None, method='cosine', N=1000,
             rdm_pred = models.predict_rdm(theta=theta)
             evaluations[i] = np.mean(compare(rdm_pred, sample, method))
         elif isinstance(models, Iterable):
-            j = 0
-            for mod in models:
-                rdm_pred = mod.predict_rdm(theta=theta[j])
+            rdm_pred_list = [mod.predict_rdm(theta=theta[j]) for j, mod in enumerate(models)]
+            for j, rdm_pred in enumerate(rdm_pred_list):
+                other_rdm_pred = rdm_pred_list[:j] + rdm_pred_list[j+1:]
                 evaluations[i, j] = np.mean(compare(rdm_pred, sample,
-                                                    method))
-                j += 1
+                                                    method,
+                                                    other_rdms=other_rdm_pred))
         if boot_noise_ceil:
             noise_min_sample, noise_max_sample = boot_noise_ceiling(
                 sample, method=method, rdm_descriptor=rdm_descriptor)
@@ -223,6 +224,9 @@ def eval_bootstrap_rdm(models, data, theta=None, method='cosine', N=1000,
         evaluations = evaluations.reshape((N, 1))
     if boot_noise_ceil:
         noise_ceil = np.array([noise_min, noise_max])
+    elif method == 'pcorr':
+        noise_ceil = np.array(boot_noise_ceiling(
+            data, method='corr', rdm_descriptor=rdm_descriptor))
     else:
         noise_ceil = np.array(boot_noise_ceiling(
             data, method=method, rdm_descriptor=rdm_descriptor))
