@@ -4,6 +4,7 @@
 evaluate model performance
 """
 
+from joblib import Parallel, delayed
 import numpy as np
 import tqdm
 import pingouin as pg
@@ -203,23 +204,32 @@ def eval_bootstrap_rdm(models, data, theta=None, method='cosine', N=1000,
     evaluations, theta, _ = input_check_model(models, theta, None, N)
     noise_min = []
     noise_max = []
-    for i in tqdm.trange(N):
+
+    # Define a helper function for parallel processing
+    def eval_helper():
         sample, rdm_idx = bootstrap_sample_rdm(data, rdm_descriptor)
         if isinstance(models, Model):
             rdm_pred = models.predict_rdm(theta=theta)
-            evaluations[i] = np.mean(compare(rdm_pred, sample, method))
+            single_evaluation = np.mean(compare(rdm_pred, sample, method))
         elif isinstance(models, Iterable):
             rdm_pred_list = [mod.predict_rdm(theta=theta[j]) for j, mod in enumerate(models)]
+            single_evaluation = np.zeros(shape=len(rdm_pred_list))
             for j, rdm_pred in enumerate(rdm_pred_list):
                 other_rdm_pred = rdm_pred_list[:j] + rdm_pred_list[j+1:]
-                evaluations[i, j] = np.mean(compare(rdm_pred, sample,
-                                                    method,
-                                                    other_rdms=other_rdm_pred))
-        if boot_noise_ceil:
-            noise_min_sample, noise_max_sample = boot_noise_ceiling(
-                sample, method=method, rdm_descriptor=rdm_descriptor)
-            noise_min.append(noise_min_sample)
-            noise_max.append(noise_max_sample)
+                single_evaluation[j] = np.mean(compare(rdm_pred, sample,
+                                                method,
+                                                other_rdms=other_rdm_pred))
+        return single_evaluation
+
+    evaluations = Parallel(n_jobs=-1)(delayed(eval_helper)()
+            for i in tqdm.trange(N))
+    evaluations = np.asarray(evaluations)
+
+    if boot_noise_ceil:
+        noise_min_max = Parallel(n_jobs=-1)(delayed(boot_noise_ceiling)(
+            sample, method=method, rdm_descriptor=rdm_descriptor)
+            )
+        noise_min, noise_max = zip(*noise_min_max)
     if isinstance(models, Model):
         evaluations = evaluations.reshape((N, 1))
     if boot_noise_ceil:
