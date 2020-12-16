@@ -37,7 +37,7 @@ def show_rdm(rdm, do_rank_transform=False, pattern_descriptor=None,
         whether to display a colorbar next to each RDM
 
     """
-    plt.figure(dpi=dpi)
+    fig = plt.figure(dpi=dpi)
     if cmap is None:
         cmap = rdm_colormap()
     if do_rank_transform:
@@ -72,8 +72,8 @@ def show_rdm(rdm, do_rank_transform=False, pattern_descriptor=None,
         if show_colorbar:
             plt.colorbar(image)
     if filename:
-        fig1 = plt.gcf()
-        fig1.savefig(filename, bbox_inches='tight')
+        fig.savefig(filename, bbox_inches='tight')
+    return fig
 
 
 def _add_descriptor_labels(rdm, descriptor, ax=None):
