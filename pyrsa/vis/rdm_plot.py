@@ -71,7 +71,7 @@ def show_rdm(rdm, do_rank_transform=False, pattern_descriptor=None,
             plt.title(rdm_descriptor)
         if show_colorbar:
             plt.colorbar(image)
-    if isinstance(filename, str):
+    if filename:
         fig1 = plt.gcf()
         fig1.savefig(filename, bbox_inches='tight')
 
