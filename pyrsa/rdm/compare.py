@@ -56,9 +56,37 @@ def compare(rdm1, rdm2, method='cosine', sigma_k=None):
         sim = compare_correlation_cov_weighted(rdm1, rdm2, sigma_k=sigma_k)
     elif method == 'cosine_cov':
         sim = compare_cosine_cov_weighted(rdm1, rdm2, sigma_k=sigma_k)
+    elif method == 'linreg':
+        sim = compare_linreg(rdm1, rdm2)
     else:
         raise ValueError('Unknown RDM comparison method requested!')
     return sim
+
+
+def compare_linreg(model_rdms, data_rdms):
+    """Linear regression comparison of observations against multiple models
+
+    Args:
+        model_rdms (pyrsa.rdm.RDMs):
+            first set of RDMs, eg models
+        data_rdms (pyrsa.rdm.RDMs):
+            second set of RDMs, eg observations
+    """
+    import sklearn.preprocessing
+
+    # Linear regression analysis. in beta mode
+    # Might need to think about normalization method
+    X = model_rdms.dissimilarities.T
+    # Don't mean-center, because 0 already has a meaningful value
+    # Normalize so these are scale-free.
+    # Could also divide by X.mean(axis=0) instead of norm, which would be similar
+    X = sklearn.preprocessing.normalize(X, axis=0)
+    # Collapse data RDMs across bootstrap sample
+    y = data_rdms.dissimilarities.mean(axis=0)
+    coef = sklearn.linear_model.Lasso(alpha=1e-4, positive=True, fit_intercept=False).fit(X, y).coef_
+
+    # Expand dimensions to fit in with convention
+    return np.expand_dims(coef, axis=-1)
 
 
 def compare_cosine(rdm1, rdm2):

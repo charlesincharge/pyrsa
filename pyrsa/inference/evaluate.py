@@ -404,10 +404,18 @@ def eval_bootstrap_rdm(models, data, theta=None, method='cosine', N=1000,
     noise_max = []
     for i in tqdm.trange(N):
         sample, rdm_idx = bootstrap_sample_rdm(data, rdm_descriptor)
-        for j, mod in enumerate(models):
+        # for j, mod in enumerate(models):
+        #     rdm_pred = mod.predict_rdm(theta=theta[j])
+        #     evaluations[i, j] = np.mean(compare(rdm_pred, sample,
+        #                                         method))
+        # Do all 3 models at the same time
+        import copy
+        model_rdms = copy.deepcopy(models[0].predict_rdm(theta=theta[0]))
+        for j, mod in enumerate(models[1:]):
             rdm_pred = mod.predict_rdm(theta=theta[j])
-            evaluations[i, j] = np.mean(compare(rdm_pred, sample,
-                                                method))
+            model_rdms.append(rdm_pred)
+
+        evaluations[i] = np.mean(compare(model_rdms, sample, method), axis=1)
         if boot_noise_ceil:
             noise_min_sample, noise_max_sample = boot_noise_ceiling(
                 sample, method=method, rdm_descriptor=rdm_descriptor)
