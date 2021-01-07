@@ -208,12 +208,22 @@ def eval_bootstrap_rdm(models, data, theta=None, method='cosine', N=1000,
             rdm_pred = models.predict_rdm(theta=theta)
             evaluations[i] = np.mean(compare(rdm_pred, sample, method))
         elif isinstance(models, Iterable):
-            j = 0
-            for mod in models:
-                rdm_pred = mod.predict_rdm(theta=theta[j])
-                evaluations[i, j] = np.mean(compare(rdm_pred, sample,
-                                                    method))
-                j += 1
+            # j = 0
+            # for mod in models:
+            #     rdm_pred = mod.predict_rdm(theta=theta[j])
+            #     evaluations[i, j] = np.mean(compare(rdm_pred, sample,
+            #                                         method))
+            #     j += 1
+
+            # Do all 3 models at the same time
+            import copy
+            model_rdms = copy.deepcopy(models[0].predict_rdm(theta=theta[0]))
+            for mod_idx in range(1, len(models)):
+                rdm = models[mod_idx].predict_rdm(theta=theta[mod_idx])
+                model_rdms.append(rdm)
+
+            evaluations[i] = np.mean(compare(model_rdms, sample, method), axis=1)
+
         if boot_noise_ceil:
             noise_min_sample, noise_max_sample = boot_noise_ceiling(
                 sample, method=method, rdm_descriptor=rdm_descriptor)
