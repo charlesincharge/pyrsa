@@ -60,6 +60,9 @@ def calc_rdm(dataset, method='euclidean', descriptor=None, noise=None,
         elif method == 'crossnobis':
             rdm = calc_rdm_crossnobis(dataset, descriptor, noise,
                                       cv_descriptor)
+        elif method == 'crosseuclid':
+            rdm = calc_rdm_crossnobis(dataset, descriptor, None,
+                                      cv_descriptor)
         elif method == 'poisson':
             rdm = calc_rdm_poisson(dataset, descriptor,
                                    prior_lambda=prior_lambda,
