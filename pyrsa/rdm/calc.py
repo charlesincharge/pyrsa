@@ -8,6 +8,7 @@ Calculation of RDMs from datasets
 from collections.abc import Iterable
 from copy import deepcopy
 import numpy as np
+from scipy.special import comb
 from pyrsa.rdm.rdms import RDMs
 from pyrsa.rdm.rdms import concat
 from pyrsa.data import average_dataset_by
@@ -65,6 +66,8 @@ def calc_rdm(dataset, method='euclidean', descriptor=None, noise=None,
             rdm = calc_rdm_euclid(dataset, descriptor)
         elif method == 'correlation':
             rdm = calc_rdm_correlation(dataset, descriptor)
+        elif method == 'correlation_cv':
+            rdm = calc_rdm_correlation_cv(dataset, descriptor)
         elif method == 'mahalanobis':
             rdm = calc_rdm_mahalanobis(dataset, descriptor, noise)
         elif method == 'crossnobis':
@@ -206,6 +209,67 @@ def calc_rdm_correlation(dataset, descriptor=None):
     rdm = RDMs(dissimilarities=np.array([rdm]),
                dissimilarity_measure='correlation',
                rdm_descriptors=deepcopy(dataset.descriptors))
+    rdm.pattern_descriptors[descriptor] = desc
+    return rdm
+
+
+def calc_rdm_correlation_cv(dataset, descriptor=None):
+    """
+    Calculates an RDM from an input dataset using a cross-validated correlation
+    distance, based on https://github.com/fwillett/cvVectorStats
+
+    Performs leave-one-out crossvalidation. May be extended to split along a
+    cv_descriptor in the future.
+
+    Args:
+        dataset (pyrsa.data.DatasetBase):
+            The dataset the RDM is computed from
+        descriptor (String):
+            obs_descriptor used to define the rows/columns of the RDM
+            defaults to one row/column per row in the dataset
+
+    Returns:
+        pyrsa.rdm.rdms.RDMs: RDMs object with the one RDM
+
+    """
+    # Average dataset by descriptor
+    measurement_avgs, desc, descriptor = _parse_input(dataset, descriptor)
+    # dataset.sort_by(descriptor) ## Is this necessary?
+
+    # 1. Calculate crossvalidated magnitude of each class
+    cv_magnitude_centered = []
+    for d in desc:
+        data_subset = dataset.subset_obs(descriptor, d)
+        cv_magnitude_centered.append(
+            _calc_magnitude_cv(data_subset.measurements, subtract_mean=True)
+        )
+
+    # 2. Pre-subtract mean along channel axis
+    # to match correlation equation
+    measurement_avgs_centered = (measurement_avgs -
+            measurement_avgs.mean(axis=-1, keepdims=True))
+
+    # 3. Estimate correlation
+    n_cond = len(desc)
+    rdm = np.empty(comb(n_cond, 2, exact=True))
+    k = 0
+    for i_cond in range(n_cond - 1):
+        for j_cond in range(i_cond + 1, n_cond):
+            # Use the normal equation for correlation, except use a
+            # crossvalidated estimate of the magnitudes
+            corr_numerator = np.dot(
+                    measurement_avgs_centered[i_cond],
+                    measurement_avgs_centered[j_cond])
+            corr_denominator = (cv_magnitude_centered[i_cond] *
+                    cv_magnitude_centered[j_cond])
+            rdm[k] = 1 - (corr_numerator / corr_denominator)
+
+            k += 1
+
+    # 4. Package in an RDM object
+    rdm = RDMs(dissimilarities=np.array([rdm]),
+               dissimilarity_measure='correlation_cv',
+               descriptors=dataset.descriptors)
     rdm.pattern_descriptors[descriptor] = desc
     return rdm
 
@@ -458,6 +522,52 @@ def _calc_rdm_crossnobis_single(measurements1, measurements2, noise):
     diff_2 = noise @ diff_2.transpose()
     rdm = np.einsum('kj,jk->k', diff_1, diff_2) / measurements1.shape[1]
     return rdm
+
+
+def _calc_magnitude_cv(measurements, subtract_mean=False):
+    """Assuming that `measurements` contains several measurements of a
+    ground-truth vector `X` with zero-mean noise, calculates an mostly-unbiased
+    estimate of ||X||.
+
+    This computes a fully unbiased estimate of ||X||^2. To estimate magnitude,
+    we apply a square-root, which slightly biases the estimate of ||X||.
+    This can return negative values.
+
+    Implementation based loosely on:
+    https://github.com/fwillett/cvVectorStats/blob/master/cvDistance.m
+
+    Args:
+        measurements (np.ndarray): n_observation x n_channel values
+        subtract_mean (bool): if True, estimate ||X - mean(X)||
+
+    Returns:
+        magnitude_est: estimate of ||X||
+            (or ||X - mean(X)|| if `subtract_mean`)
+
+    """
+    n_observation, n_channels = measurements.shape
+    squared_magnitude_estimates = np.zeros(n_observation)
+    # Crossvalidate each observation (group A) against the group of other
+    # (group B) observations
+    observation_indices = np.arange(n_observation)
+    for groupA_index in observation_indices:
+        groupB_indices = np.setdiff1d(observation_indices, groupA_index)
+
+        # "group" A is a single measurement - no need to take mean
+        groupA_mean = measurements[groupA_index]
+        groupB_mean = measurements[groupB_indices].mean(axis=0)
+
+        if subtract_mean:
+            # Subtract channel-wise mean to for ||X - mean(X)||
+            groupA_mean = groupA_mean - groupA_mean.mean()
+            groupB_mean = groupB_mean - groupB_mean.mean()
+
+        squared_magnitude_estimates[groupA_index] = np.dot(groupA_mean, groupB_mean)
+
+    squared_magnitude = np.mean(squared_magnitude_estimates)
+    magnitude_est = np.sign(squared_magnitude) * np.sqrt(abs(squared_magnitude))
+
+    return magnitude_est
 
 
 def _gen_default_cv_descriptor(dataset, descriptor):
