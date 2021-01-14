@@ -6,6 +6,7 @@ Definition of RSA RDMs class and subclasses
 @author: baihan
 """
 
+import collections.abc
 import numpy as np
 from scipy.stats import rankdata
 from pyrsa.util.rdm_utils import batch_to_vectors
@@ -373,7 +374,8 @@ class RDMs:
             if method == 'alpha':
                 descriptor = self.pattern_descriptors[dname]
                 self.reorder(np.argsort(descriptor))
-            elif isinstance(method, (list, np.ndarray)):
+            elif isinstance(method, collections.abc.Sequence):
+                # Note that this will capture strings, too
                 # in this case, `method` is the desired descriptor order
                 new_order = method
                 descriptor = self.pattern_descriptors[dname]
