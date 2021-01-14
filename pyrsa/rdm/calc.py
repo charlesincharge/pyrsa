@@ -374,8 +374,7 @@ def calc_rdm_crossnobis(dataset, descriptor, noise=None,
                 average_dataset_by(data_train, descriptor)
             measurements_test, _, _ = \
                 average_dataset_by(data_test, descriptor)
-            n_cond = measurements_train.shape[0]
-            n_channel = measurements_train.shape[1]
+            n_cond, n_channel = measurements_train.shape
             rdm = np.empty(int(n_cond * (n_cond-1) / 2))
             k = 0
             for i_cond in range(n_cond - 1):
@@ -407,7 +406,7 @@ def calc_rdm_crossnobis(dataset, descriptor, noise=None,
                                       + variances[j_fold]))
                     rdms.append(rdm)
     rdms = np.array(rdms)
-    rdm = np.einsum('ij->j', rdms) / len(cv_folds)
+    rdm = rdms.mean(axis=0)
     rdm = RDMs(dissimilarities=np.array([rdm]),
                dissimilarity_measure='crossnobis',
                rdm_descriptors=deepcopy(dataset.descriptors))
