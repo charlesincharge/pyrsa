@@ -376,24 +376,21 @@ def calc_rdm_crossnobis(dataset, descriptor, noise=None,
                     else:
                         rdm[k] = (np.sum(diff_train
                                         * np.matmul(noise, diff_test))
-                                        / n_channel)
+                                        / n_channel) # This takes care of dividing by channels
                     k += 1
             rdms.append(rdm)
             weights.append(data_test.n_obs)
     else:  # a list of noises was provided
         measurements = []
-        variances = []
         for i_fold in range(len(cv_folds)):
             data = dataset.subset_obs(cv_descriptor, cv_folds[i_fold])
             measurements.append(average_dataset_by(data, descriptor)[0])
-            variances.append(np.linalg.inv(noise[i_fold]))
         for i_fold in range(len(cv_folds)):
-            for j_fold in range(i_fold + 1, len(cv_folds)):
+            for j_fold in range(len(cv_folds)):
                 if i_fold != j_fold:
                     rdm = _calc_rdm_crossnobis_single(
                         measurements[i_fold], measurements[j_fold],
-                        np.linalg.inv(variances[i_fold]
-                                      + variances[j_fold]))
+                        noise[i_fold])
                     rdms.append(rdm)
     rdms = np.array(rdms)
     rdm = rdms.mean(axis=0)
