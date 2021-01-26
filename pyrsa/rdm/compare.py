@@ -80,12 +80,13 @@ def compare_linreg(model_rdms, data_rdms):
     # Normalize so these are scale-free.
     # Could also divide by X.mean(axis=0) instead of norm, which would be similar
     X = sklearn.preprocessing.normalize(X, axis=0)
-    # Collapse data RDMs across bootstrap sample
-    y = data_rdms.dissimilarities.mean(axis=0)
+    # Or 2. Don't collapse data RDMs across sample; take average later
+    y = data_rdms.dissimilarities.T
+
     coef = sklearn.linear_model.Lasso(alpha=1e-4, positive=True, fit_intercept=False).fit(X, y).coef_
 
-    # Expand dimensions to fit in with convention
-    return np.expand_dims(coef, axis=-1)
+    # Already have multiple dimensions, keep them
+    return coef.T
 
 
 def compare_cosine(rdm1, rdm2):
