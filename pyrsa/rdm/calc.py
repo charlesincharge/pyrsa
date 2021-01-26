@@ -372,25 +372,28 @@ def calc_rdm_crossnobis(dataset, descriptor, noise=None,
                     diff_test = measurements_test[i_cond] \
                         - measurements_test[j_cond]
                     if noise is None:
-                        rdm[k] = np.sum(diff_train * diff_test) / n_channel
+                        rdm[k] = np.mean(diff_train * diff_test)
                     else:
-                        rdm[k] = (np.sum(diff_train
-                                        * np.matmul(noise, diff_test))
-                                        / n_channel) # This takes care of dividing by channels
+                        rdm[k] = np.mean(diff_train
+                                         * np.matmul(noise, diff_test))
                     k += 1
             rdms.append(rdm)
             weights.append(data_test.n_obs)
     else:  # a list of noises was provided
         measurements = []
+        variances = []
         for i_fold in range(len(cv_folds)):
             data = dataset.subset_obs(cv_descriptor, cv_folds[i_fold])
             measurements.append(average_dataset_by(data, descriptor)[0])
+            variances.append(np.linalg.inv(noise[i_fold]))
         for i_fold in range(len(cv_folds)):
-            for j_fold in range(len(cv_folds)):
+             for j_fold in range(i_fold + 1, len(cv_folds)):
                 if i_fold != j_fold:
                     rdm = _calc_rdm_crossnobis_single(
                         measurements[i_fold], measurements[j_fold],
-                        noise[i_fold])
+                        np.linalg.inv(
+                            (variances[i_fold] + variances[j_fold]) / 2)
+                        )
                     rdms.append(rdm)
     rdms = np.array(rdms)
     rdm = rdms.mean(axis=0)
@@ -425,7 +428,7 @@ def calc_rdm_poisson(dataset, descriptor=None, prior_lambda=1,
     """
     measurements, desc, descriptor = _parse_input(dataset, descriptor)
     measurements = (measurements + prior_lambda * prior_weight) \
-        / (prior_lambda * prior_weight)
+        / (1 + prior_weight)
     diff = _calc_pairwise_differences(measurements)
     diff_log = _calc_pairwise_differences(np.log(measurements))
     rdm = np.einsum('ij,ij->i', diff, diff_log) / measurements.shape[1]
@@ -477,10 +480,10 @@ def calc_rdm_poisson_cv(dataset, descriptor=None, prior_lambda=1,
         measurements_test, _, _ = average_dataset_by(data_test, descriptor)
         measurements_train = (measurements_train
                               + prior_lambda * prior_weight) \
-            / (prior_lambda * prior_weight)
+            / (1 + prior_weight)
         measurements_test = (measurements_test
                              + prior_lambda * prior_weight) \
-            / (prior_lambda * prior_weight)
+            / (1 + prior_weight)
         diff = _calc_pairwise_differences(measurements_train)
         diff_log = _calc_pairwise_differences(np.log(measurements_test))
         rdm = np.einsum('ij,ij->i', diff, diff_log) \
