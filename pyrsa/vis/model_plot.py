@@ -239,7 +239,7 @@ def plot_model_comparison(result, sort=False, colors=None,
     if test_above_0 is True:
         test_above_0 = 'dewdrops'
     if test_above_0:
-        p = ((evaluations < 0).sum(axis=0) + 1) / n_bootstraps
+        p = ((evaluations <= 0).sum(axis=0) + 1) / n_bootstraps
         model_significant = p < alpha / n_models
         half_sym_size = 9
         if test_above_0.lower() == 'dewdrops':
