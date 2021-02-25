@@ -921,4 +921,6 @@ def _get_y_label(method):
     elif method.lower() == 'tau-a':
         y_label = '[across-subject mean of ' \
             + 'Kendall tau-a rank correlation]'
+    else:
+        y_label = '[across-subject mean of {}]'.format(method)
     return y_label
