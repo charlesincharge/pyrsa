@@ -57,6 +57,8 @@ def compare(rdm1, rdm2, method='cosine', sigma_k=None):
         sim = compare_cosine_cov_weighted(rdm1, rdm2, sigma_k=sigma_k)
     elif method == 'linreg':
         sim = compare_linreg(rdm1, rdm2)
+    elif method == 'var_explained':
+        sim = compare_unique_variance_explained(rdm1, rdm2)
     else:
         raise ValueError('Unknown RDM comparison method requested!')
     return sim
@@ -80,13 +82,70 @@ def compare_linreg(model_rdms, data_rdms):
     # Normalize so these are scale-free.
     # Could also divide by X.mean(axis=0) instead of norm, which would be similar
     X = sklearn.preprocessing.normalize(X, axis=0)
-    # Or 2. Don't collapse data RDMs across sample; take average later
+    # Option 1: collapse data RDMs across sample
+    y = data_rdms.dissimilarities.mean(axis=0)
+    # # Or 2. Don't collapse data RDMs across sample; take average later
+    # y = data_rdms.dissimilarities.T
+
+    coef = sklearn.linear_model.Lasso(alpha=alpha, positive=True, fit_intercept=False).fit(X, y).coef_
+
+    # # Already have multiple dimensions, keep them
+    # return coef.T
+    # Need to expand coefficients
+    return np.expand_dims(coef, axis=-1)
+
+
+def compare_unique_variance_explained(model_rdms, data_rdms):
+    """Compute unique variance explained by each model RDM
+    by subtracting total-variance-explained by reduced RDM (excludes 1 RDM) from
+    the total-variance-explained by full RDM.
+
+    See: https://www.pnas.org/content/116/43/21854
+
+    Args:
+        model_rdms (pyrsa.rdm.RDMs):
+            first set of RDMs, ie models
+        data_rdms (pyrsa.rdm.RDMs):
+            second set of RDMs, ie observations
+    """
+    X = model_rdms.dissimilarities.T
+    # Standardize dataset, as https://www.pnas.org/content/116/43/21854 does
+    # TODO: Should we mean-subtract or not?
+    import sklearn
+    X = sklearn.preprocessing.scale(X, axis=0, with_mean=False)
+
+    # May or may not want to take the mean first?
     y = data_rdms.dissimilarities.T
 
-    coef = sklearn.linear_model.ElasticNet(alpha=3e-3, positive=True, fit_intercept=False).fit(X, y).coef_
+    # Non-negative least squares
+    regr = sklearn.linear_model.LinearRegression(positive=True, fit_intercept=False)
 
-    # Already have multiple dimensions, keep them
-    return coef.T
+    def variance_explained(regr, X, y):
+        regr.fit(X, y)
+        y_pred = regr.predict(X)
+        explained_variance = np.var(y) - np.var(y - y_pred)
+        return explained_variance
+
+    # Calculate least squares
+    # TODO: R^2 score is not exactly the same as variance_explained
+    # Need to calculate
+    full_variance_explained_score = variance_explained(regr, X, y)
+
+    # Repeat this for subsets
+    unique_variance_explained_arr = np.zeros(model_rdms.n_rdm)
+    if model_rdms.n_rdm == 1:
+        # No X values to delete
+        unique_variance_explained_arr[0] = full_variance_explained_score
+    else:
+        for rdm_idx in range(model_rdms.n_rdm):
+            X_sub = np.delete(X, rdm_idx, axis=-1)
+            variance_explained_score = variance_explained(regr, X_sub, y)
+
+            unique_variance_explained_score = full_variance_explained_score - variance_explained_score
+            unique_variance_explained_arr[rdm_idx] = unique_variance_explained_score
+
+    # Need to return a 2-dimensional output
+    return np.expand_dims(unique_variance_explained_arr, axis=-1)
 
 
 def compare_cosine(rdm1, rdm2):
