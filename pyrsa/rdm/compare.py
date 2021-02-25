@@ -88,7 +88,7 @@ def compare_linreg(model_rdms, data_rdms):
     # # Or 2. Don't collapse data RDMs across sample; take average later
     # y = data_rdms.dissimilarities.T
 
-    alpha = 1
+    alpha = 3e-3
     coef = sklearn.linear_model.Lasso(alpha=alpha, positive=True, fit_intercept=False).fit(X, y).coef_
 
     # # Already have multiple dimensions, keep them
