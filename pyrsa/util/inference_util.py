@@ -84,7 +84,7 @@ def pool_rdm(rdms, method='cosine'):
 
     """
     rdm_vec = rdms.get_vectors()
-    if (method == 'euclid') or (method == 'linreg'):
+    if method in ('euclid', 'linreg', 'var_explained'):
         rdm_vec = _nan_mean(rdm_vec)
     elif method == 'cosine':
         rdm_vec = rdm_vec / np.sqrt(np.nanmean(rdm_vec ** 2, axis=1,
