@@ -247,9 +247,17 @@ def eval_fixed(models, data, theta=None, method='cosine'):
     models, evaluations, theta, _ = input_check_model(models, theta, None, 1)
     evaluations = np.repeat(np.expand_dims(evaluations, -1),
                             data.n_rdm, -1)
-    for k, model in enumerate(models):
-        rdm_pred = model.predict_rdm(theta=theta[k])
-        evaluations[k] = compare(rdm_pred, data, method)
+    # for k, model in enumerate(models):
+    #     rdm_pred = model.predict_rdm(theta=theta[k])
+    #     evaluations[k] = compare(rdm_pred, data, method)
+
+    import copy
+    model_rdms = copy.deepcopy(models[0].predict_rdm(theta=theta[0]))
+    for j, mod in enumerate(models[1:]):
+        rdm_pred = mod.predict_rdm(theta=theta[j])
+        model_rdms.append(rdm_pred)
+    evaluations = compare(model_rdms, data, method)
+
     evaluations = evaluations.reshape((1, len(models), data.n_rdm))
     noise_ceil = boot_noise_ceiling(
         data, method=method, rdm_descriptor='index')
