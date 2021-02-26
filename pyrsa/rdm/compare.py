@@ -83,18 +83,18 @@ def compare_linreg(model_rdms, data_rdms):
     # Normalize so these are scale-free.
     # Could also divide by X.mean(axis=0) instead of norm, which would be similar
     X = sklearn.preprocessing.normalize(X, axis=0)
-    # Option 1: collapse data RDMs across sample
-    y = data_rdms.dissimilarities.mean(axis=0)
-    # # Or 2. Don't collapse data RDMs across sample; take average later
-    # y = data_rdms.dissimilarities.T
+    # # Option 1: collapse data RDMs across sample
+    # y = data_rdms.dissimilarities.mean(axis=0)
+    # Or 2. Don't collapse data RDMs across sample; take average later
+    y = data_rdms.dissimilarities.T
 
     alpha = 3e-3
     coef = sklearn.linear_model.Lasso(alpha=alpha, positive=True, fit_intercept=False).fit(X, y).coef_
 
-    # # Already have multiple dimensions, keep them
-    # return coef.T
-    # Need to expand coefficients
-    return np.expand_dims(coef, axis=-1)
+    # Already have multiple dimensions, keep them
+    return coef.T
+    # # Need to expand coefficients
+    # return np.expand_dims(coef, axis=-1)
 
 
 def compare_unique_variance_explained(model_rdms, data_rdms):
