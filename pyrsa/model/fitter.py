@@ -78,7 +78,8 @@ def fit_optimize(model, data, method='cosine', pattern_idx=None,
                      pattern_idx=pattern_idx,
                      pattern_descriptor=pattern_descriptor)
     theta0 = np.random.rand(model.n_param)
-    theta = opt.minimize(_loss_opt, theta0)
+    bounds = ((0, None),) * model.n_param
+    theta = opt.minimize(_loss_opt, theta0, bounds=bounds)
     return theta.x
 
 
