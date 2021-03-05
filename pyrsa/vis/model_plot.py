@@ -442,7 +442,7 @@ def plot_model_comparison(result, sort=False, colors=None,
             transform=trans)
     if models is not None:
         ax.set_xticklabels([m.name for m in models], fontsize=fs2,
-                           rotation=45)
+                           rotation=45, ha='right')
 
 
 def plot_nili_bars(axbar, significant, version=1):
